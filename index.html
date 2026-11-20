@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>COOKIE PANIC! — Rookie Bakery Rush + The Taste Test</title>
+<meta name="description" content="The Rookie Bakery: a juicy cookie-catching arcade game with a 2-player cookie duel, plus The Taste Test — the official-unofficial judging ceremony for rookie hacks. Rookies make cookies. One file, zero installs.">
+<style>
+  :root{
+    --crust:#e8a33d; --crust-dark:#b06a1e; --dough:#f4d9a8; --choc:#5b3218;
+    --cream:#fff6e8; --straw:#e4586b; --ink:#3a2415; --gold:#ffd34d; --burnt:#3b2b22;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;
+    background:radial-gradient(120% 90% at 50% 0%, #6b3f1d 0%, #4a2a12 55%, #331c0c 100%);
+    color:var(--cream); user-select:none; -webkit-user-select:none;
+    overscroll-behavior:none;
+  }
+  #stage{position:fixed;inset:0;display:flex;align-items:stretch;justify-content:center}
+  canvas#game{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;
+       padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 8px calc(10px + env(safe-area-inset-left));
+       font-weight:bold}
+  .hud-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .hud-box{background:rgba(58,36,21,.72);border:2px solid rgba(255,214,138,.35);border-radius:12px;
+           padding:6px 12px;backdrop-filter:blur(2px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+  #scoreBox{font-size:clamp(15px,2.6vmin,22px);line-height:1.15;min-width:8.5ch}
+  #scoreBox .lbl{font-size:.62em;letter-spacing:.18em;color:#ffd98f;opacity:.85}
+  #scoreVal{font-size:1.28em;color:var(--gold);text-shadow:0 2px 0 rgba(0,0,0,.35)}
+  #waveLbl{font-size:.66em;color:#ffe9c4;opacity:.9}
+  #livesBox{display:flex;gap:6px;align-items:center;font-size:clamp(14px,2.4vmin,20px)}
+  #comboWrap{margin-top:6px;align-self:center;text-align:center;opacity:0;transition:opacity .25s}
+  #comboWrap.on{opacity:1}
+  #comboLbl{font-size:clamp(16px,3vmin,24px);color:var(--gold);text-shadow:0 2px 0 rgba(0,0,0,.4)}
+  #comboBar{width:min(46vw,240px);height:10px;margin:4px auto 0;border-radius:99px;
+            background:rgba(0,0,0,.35);overflow:hidden;border:1px solid rgba(255,214,138,.3)}
+  #comboFill{height:100%;width:0%;border-radius:99px;
+             background:linear-gradient(90deg,#ffd34d,#ff9e3d,#ff5d73)}
+  #feverBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(58px + env(safe-area-inset-top));
+            width:min(70vw,340px);height:12px;border-radius:99px;background:rgba(0,0,0,.4);
+            border:2px solid rgba(255,211,77,.7);display:none;overflow:hidden;z-index:5}
+  #feverFill{height:100%;width:100%;background:linear-gradient(90deg,#ff5d73,#ffd34d,#7ef0c1,#ffd34d);
+             background-size:200% 100%;animation:slide 1s linear infinite}
+  @keyframes slide{to{background-position:-200% 0}}
+  .hud-btns{position:fixed;right:calc(10px + env(safe-area-inset-right));
+            bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;pointer-events:auto;z-index:6}
+  .icon-btn{width:44px;height:44px;border-radius:12px;border:2px solid rgba(255,214,138,.4);
+            background:rgba(58,36,21,.8);color:#ffe9c4;font-size:20px;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;transition:transform .12s}
+  .icon-btn:active{transform:scale(.9)}
+
+  /* ---------- center toast ---------- */
+  #toast{position:fixed;left:50%;top:34%;transform:translate(-50%,-50%) scale(.6);opacity:0;
+         font-weight:bold;text-align:center;pointer-events:none;z-index:7;
+         transition:opacity .3s, transform .3s cubic-bezier(.2,1.6,.4,1);white-space:nowrap}
+  #toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  #toast .t1{font-size:clamp(26px,6vmin,54px);color:var(--gold);
+             text-shadow:0 3px 0 #a05a10, 0 6px 18px rgba(0,0,0,.45);letter-spacing:.02em}
+  #toast .t2{font-size:clamp(13px,2.4vmin,19px);color:#ffe9c4;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+
+  /* ---------- overlay screens ---------- */
+  .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+          background:rgba(30,16,7,.78);backdrop-filter:blur(3px);z-index:10;padding:18px;
+          overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+  .card{background:linear-gradient(180deg,#fff6e8 0%,#f7e3c2 100%);color:var(--ink);
+        border-radius:22px;max-width:560px;width:100%;padding:clamp(18px,4vmin,34px);
+        box-shadow:0 18px 60px rgba(0,0,0,.5), inset 0 0 0 6px rgba(232,163,61,.35);
+        text-align:center;max-height:calc(100% - 12px);overflow-y:auto}
+  .badge{display:inline-block;background:var(--straw);color:#fff;border-radius:99px;
+         padding:4px 14px;font-size:clamp(11px,1.9vmin,13px);letter-spacing:.14em;font-weight:bold}
+  h1.title{font-size:clamp(38px,9vmin,64px);line-height:.95;margin:10px 0 2px;
+           color:var(--choc);text-shadow:0 3px 0 #f2c48d;letter-spacing:-.01em}
+  h1.title .pop{color:var(--straw);text-shadow:0 3px 0 #a8333f}
+  .subtitle{font-size:clamp(14px,2.6vmin,18px);color:#8a5a2b;margin-bottom:14px}
+  .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0 16px;text-align:left}
+  .rule{background:rgba(255,255,255,.55);border-radius:12px;padding:8px 10px;font-size:clamp(12px,2vmin,14px);
+        display:flex;gap:8px;align-items:center;line-height:1.25}
+  .rule .em{font-size:1.5em;flex:0 0 auto}
+  .btn{display:block;width:100%;margin:8px 0;border:none;border-radius:16px;padding:14px 18px;
+       font-size:clamp(16px,3vmin,20px);font-weight:bold;cursor:pointer;color:#fff;
+       background:linear-gradient(180deg,#ffb23d,#e8811f);box-shadow:0 5px 0 #a05a10, 0 10px 18px rgba(0,0,0,.25);
+       transition:transform .1s, box-shadow .1s;letter-spacing:.02em}
+  .btn:active{transform:translateY(4px);box-shadow:0 1px 0 #a05a10}
+  .btn.alt{background:linear-gradient(180deg,#8fd3a8,#4e9e6f);box-shadow:0 5px 0 #2e6b47,0 10px 18px rgba(0,0,0,.25)}
+  .btn.alt:active{box-shadow:0 1px 0 #2e6b47}
+  .btn.ghost{background:#fff;color:var(--choc);box-shadow:0 5px 0 #d8b98a;font-size:clamp(13px,2.4vmin,16px);padding:11px}
+  .btn.ghost:active{box-shadow:0 1px 0 #d8b98a}
+  .fineprint{font-size:clamp(11px,1.9vmin,13px);color:#8a5a2b;margin-top:8px;line-height:1.5}
+  .kbd{background:#fff;border:1px solid #d8b98a;border-bottom-width:3px;border-radius:6px;
+       padding:1px 7px;font-size:.9em;display:inline-block;margin:0 2px}
+  #hsLine{font-size:clamp(13px,2.4vmin,16px);color:#8a5a2b;margin-top:10px;font-weight:bold}
+  #ledgerLine{font-size:clamp(11px,2vmin,14px);color:#a97d4e;margin-top:4px;font-weight:bold}
+  /* judgment */
+  #judgeFace{font-size:clamp(56px,14vmin,96px);line-height:1;margin:6px 0;animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-8px) rotate(3deg)}}
+  .verdicts{display:flex;gap:10px;justify-content:center;margin:12px 0;flex-wrap:wrap}
+  .vq{background:#fff;border-radius:14px;padding:10px 16px;font-size:clamp(15px,3vmin,20px);
+      font-weight:bold;box-shadow:0 4px 0 #d8b98a}
+  .vq .yes{color:#3d9e5f}.vq .no{color:#c4622d}
+  .rankLbl{font-size:clamp(13px,2.2vmin,15px);letter-spacing:.22em;color:#8a5a2b}
+  .rankName{font-size:clamp(28px,6vmin,44px);color:var(--straw);font-weight:bold;
+            text-shadow:0 3px 0 #a8333f;margin:2px 0 6px}
+  .quip{font-size:clamp(13px,2.4vmin,16px);color:#6b4423;margin-bottom:10px;font-style:italic}
+  .statRow{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:8px 0 4px;
+           font-size:clamp(13px,2.4vmin,16px)}
+  .statRow b{color:var(--choc)}
+  .newbest{color:#3d9e5f;font-weight:bold;animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:.35}}
+  .ach-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+  .ach{background:rgba(255,211,77,.35);border:1px solid #d8a94d;border-radius:99px;
+       padding:3px 10px;font-size:clamp(10px,1.9vmin,12px);font-weight:bold;color:#6b4423}
+  .ach.locked{opacity:.38;filter:grayscale(1)}
+  .hidden{display:none !important}
+  @media (prefers-reduced-motion: reduce){
+    #feverFill,#judgeFace{animation:none}
+    #toast{transition:opacity .2s}
+  }
+
+  /* ---------- mode hub ---------- */
+  .mode-note{font-size:clamp(11px,1.9vmin,13px);color:#8a5a2b;margin-top:2px;letter-spacing:.03em}
+  .pill-row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0 2px}
+  .pill{background:rgba(255,211,77,.3);border:1px solid #d8a94d;border-radius:99px;
+        padding:2px 10px;font-size:clamp(10px,1.8vmin,12px);font-weight:bold;color:#6b4423}
+
+  /* ---------- versus HUD ---------- */
+  #vsTimer{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);
+           z-index:5;background:rgba(58,36,21,.82);border:2px solid rgba(255,214,138,.4);
+           border-radius:12px;padding:4px 16px;font-weight:bold;text-align:center;pointer-events:none}
+  #vsTimer .t{font-size:clamp(18px,3.4vmin,26px);color:var(--gold);text-shadow:0 2px 0 rgba(0,0,0,.4)}
+  #vsTimer .lbl{font-size:.55em;letter-spacing:.22em;color:#ffd98f}
+  #vsTimer.hot .t{color:#ff5d73;animation:blink .5s steps(2) infinite}
+  .p-score{font-size:clamp(13px,2.3vmin,18px);line-height:1.15}
+  .p-score .lbl{font-size:.62em;letter-spacing:.14em}
+  .p1col{color:#ff9e9e}.p2col{color:#9ed0ff}
+  #p2Box{text-align:right}
+
+  /* ---------- taste test ---------- */
+  .tt-head .mini{font-size:clamp(10px,1.8vmin,12px);color:#8a5a2b;letter-spacing:.18em;margin-top:6px}
+  .tt-form{display:flex;gap:8px;margin:10px 0 6px}
+  .tt-form input[type=text]{flex:1;min-width:0;border:2px solid #d8b98a;border-radius:12px;
+        padding:10px 12px;font-size:clamp(14px,2.4vmin,16px);font-family:inherit;background:#fff;color:var(--ink)}
+  .tt-form select{border:2px solid #d8b98a;border-radius:12px;padding:10px 6px;font-size:clamp(16px,3vmin,20px);
+        background:#fff;color:var(--ink);font-family:inherit}
+  .tt-list{margin:10px 0;max-height:36vh;overflow-y:auto;padding-right:4px}
+  .tt-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.6);
+           border-radius:12px;padding:8px 10px;margin-bottom:6px;flex-wrap:wrap}
+  .tt-item .emo{font-size:1.5em}
+  .tt-item .nm{flex:1;min-width:110px;font-weight:bold;font-size:clamp(13px,2.3vmin,16px);color:var(--choc);
+               overflow-wrap:anywhere;text-align:left}
+  .rate-btn{border:2px solid #d8b98a;border-radius:99px;background:#fff;color:#8a5a2b;
+            font-weight:bold;font-size:clamp(11px,2vmin,13px);padding:5px 12px;cursor:pointer;
+            font-family:inherit;transition:transform .1s}
+  .rate-btn:active{transform:scale(.92)}
+  .rate-btn.on-good{background:#3d9e5f;border-color:#3d9e5f;color:#fff}
+  .rate-btn.on-cool{background:#4d7cf0;border-color:#4d7cf0;color:#fff}
+  .tt-del{border:none;background:none;color:#c4622d;font-size:16px;cursor:pointer;padding:4px}
+  .tt-empty{text-align:center;color:#8a5a2b;font-size:clamp(12px,2.2vmin,14px);padding:14px 4px;font-style:italic}
+  .podium{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin:16px 0 6px}
+  .pod{flex:1;max-width:150px;text-align:center;border-radius:12px 12px 0 0;padding:10px 4px 12px;
+       background:linear-gradient(180deg,#fff6e8,#f2dcb6);box-shadow:0 4px 0 #d8b98a}
+  .pod .medal{font-size:clamp(26px,6vmin,40px);line-height:1}
+  .pod .pn{font-size:clamp(11px,2vmin,14px);font-weight:bold;color:var(--choc);margin-top:6px;
+           overflow-wrap:anywhere;max-height:3.6em;overflow:hidden}
+  .pod .pv{font-size:clamp(11px,2vmin,13px);color:#8a5a2b}
+  .pod.first{min-height:132px;background:linear-gradient(180deg,#fff3b0,#ffd34d);box-shadow:0 4px 0 #a8791f}
+  .pod.second{min-height:106px}
+  .pod.third{min-height:88px}
+  .hon-list{font-size:clamp(11px,2vmin,13px);color:#8a5a2b;text-align:center;margin:4px 0 10px;line-height:1.7}
+  .confetti{position:fixed;top:-12px;z-index:40;pointer-events:none;border-radius:2px;
+            animation:cfall linear forwards}
+  @keyframes cfall{to{transform:translateY(108vh) rotate(720deg)}}
+  .vs-face{font-size:clamp(40px,10vmin,72px);line-height:1;margin:4px 0}
+  .vs-winner{font-size:clamp(22px,5.5vmin,40px);font-weight:bold;color:var(--straw);
+             text-shadow:0 3px 0 #a8333f;margin-bottom:4px}
+  .vs-vs{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:10px 0 4px;
+         font-size:clamp(13px,2.6vmin,17px)}
+  .vs-vs b{color:var(--choc)}
+  .tt-tip{font-size:clamp(11px,1.9vmin,13px);color:#8a5a2b;text-align:center;margin:6px 0 0;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="game"></canvas></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-top">
+    <div class="hud-box" id="scoreBox">
+      <div class="lbl" id="scoreLbl">SCORE</div>
+      <div><span id="scoreVal">0</span> <span id="waveLbl">Wave 1</span></div>
+    </div>
+    <div class="hud-box" id="livesBox" aria-label="lives"></div>
+    <div class="hud-box p-score hidden" id="p2Box">
+      <div class="lbl">BLUE TRAY <span class="p2col">P2</span></div>
+      <div><span id="p2Val" class="p2col">0</span></div>
+    </div>
+  </div>
+  <div id="comboWrap"><div id="comboLbl">COMBO ×1</div><div id="comboBar"><div id="comboFill"></div></div></div>
+</div>
+<div id="vsTimer" class="hidden"><div class="lbl">TIME</div><div class="t">60</div></div>
+<div id="feverBar"><div id="feverFill"></div></div>
+<div id="toast"><div class="t1"></div><div class="t2"></div></div>
+<div class="hud-btns">
+  <button class="icon-btn" id="btnMute" title="Sound on/off" aria-label="Toggle sound">🔊</button>
+  <button class="icon-btn" id="btnPause" title="Pause (P)" aria-label="Pause">⏸</button>
+</div>
+
+<!-- START SCREEN -->
+<div class="screen" id="startScreen">
+  <div class="card">
+    <span class="badge">THE ROOKIE BAKERY · ROOKIE HACKS EDITION</span>
+    <h1 class="title">COOKIE <span class="pop">PANIC!</span></h1>
+    <div class="subtitle">Rookies make cookies — and today, the bakery has three rooms.</div>
+    <div class="rules">
+      <div class="rule"><span class="em">🍪</span><span><b>Catch cookies</b>, chain combos, dodge the burnt ones.</span></div>
+      <div class="rule"><span class="em">✨</span><span><b>Golden cookie</b> = FEVER. <b>🥛 Milk</b> = shield. <b>🥐 Sisu bun</b> = +200.</span></div>
+      <div class="rule"><span class="em">👥</span><span><b>Versus:</b> two trays, one oven — steal cookies from your rival.</span></div>
+      <div class="rule"><span class="em">⚖️</span><span><b>Taste Test:</b> judge the whole hackathon on <i>good?</i> / <i>cool?</i></span></div>
+    </div>
+    <button class="btn" id="btnPlay">▶ SOLO BAKERY RUSH</button>
+    <button class="btn alt" id="btnDaily">📅 DAILY BATCH — <span id="dailyLbl">today</span></button>
+    <button class="btn alt" id="btnVs">👥 COOKIE DUEL — 2 players, 60 seconds</button>
+    <button class="btn ghost" id="btnTaste">⚖️ THE TASTE TEST — judge the hackathon</button>
+    <button class="btn ghost" id="btnDemo">🤖 Low / No-Code Mode — the bakery runs itself (demo)</button>
+    <div id="hsLine"></div>
+    <div id="ledgerLine"></div>
+    <div class="fineprint">Runs 100% offline in this single file · works on phones · zero installs · zero cookies tracked 🍪<br>
+      Made with love (and dough) for <b>rookie hacks</b> — judged by Nate on <i>“good?”</i> and <i>“cool?”</i></div>
+  </div>
+</div>
+
+<!-- PAUSE SCREEN -->
+<div class="screen hidden" id="pauseScreen">
+  <div class="card">
+    <h1 class="title" style="font-size:clamp(30px,7vmin,48px)">☕ Break time</h1>
+    <div class="subtitle">Even rookie bakers get a coffee break.</div>
+    <button class="btn" id="btnResume">▶ Back to baking</button>
+    <button class="btn ghost" id="btnQuit">🏠 Quit to menu</button>
+  </div>
+</div>
+
+<!-- GAME OVER — NATE'S TASTE TEST -->
+<div class="screen hidden" id="overScreen">
+  <div class="card">
+    <div class="rankLbl">NATE’S TASTE TEST</div>
+    <div id="judgeFace">🧑‍🍳</div>
+    <div class="rankName" id="rankName">Rookie Baker</div>
+    <div class="quip" id="quip"></div>
+    <div class="verdicts">
+      <div class="vq">good? <span class="yes" id="vGood">✓</span></div>
+      <div class="vq">cool? <span class="yes" id="vCool">✓</span></div>
+    </div>
+    <div class="statRow">
+      <span>Score <b id="fScore">0</b></span>
+      <span>Best combo <b id="fCombo">×1</b></span>
+      <span>Cookies <b id="fCookies">0</b></span>
+      <span>Wave <b id="fWave">1</b></span>
+    </div>
+    <div id="bestLine" style="margin-top:6px;font-weight:bold"></div>
+    <div class="ach-list" id="achList"></div>
+    <button class="btn" id="btnAgain" style="margin-top:14px">↺ BAKE ANOTHER BATCH</button>
+    <button class="btn ghost" id="btnCard">🎴 SAVE YOUR BAKER CARD</button>
+    <button class="btn ghost" id="btnMenu">🏠 Menu</button>
+  </div>
+</div>
+
+<!-- VERSUS RESULTS -->
+<div class="screen hidden" id="vsScreen">
+  <div class="card">
+    <div class="rankLbl">COOKIE DUEL — FINAL TALLY</div>
+    <div class="vs-face" id="vsFace">👑</div>
+    <div class="vs-winner" id="vsWinner">RED TRAY WINS!</div>
+    <div class="quip" id="vsQuip"></div>
+    <div class="vs-vs">
+      <span>🔴 Red <b id="vsP1">0</b></span>
+      <span>🔵 Blue <b id="vsP2">0</b></span>
+    </div>
+    <div class="verdicts">
+      <div class="vq">red good? <span class="yes" id="vsG1">✓</span> cool? <span class="yes" id="vsC1">✓</span></div>
+      <div class="vq">blue good? <span class="yes" id="vsG2">✓</span> cool? <span class="yes" id="vsC2">✓</span></div>
+    </div>
+    <button class="btn" id="btnVsAgain" style="margin-top:12px">⚔️ REMATCH!</button>
+    <button class="btn ghost" id="btnVsCard">🎴 SAVE THE DUEL CARD</button>
+    <button class="btn ghost" id="btnVsMenu">🏠 Menu</button>
+  </div>
+</div>
+
+<!-- TASTE TEST — RATER -->
+<div class="screen hidden" id="ttScreen">
+  <div class="card tt-wrap">
+    <div class="tt-head">
+      <span class="badge">THE TASTE TEST</span>
+      <h1 class="title" style="font-size:clamp(28px,6vmin,44px)">Judge the <span class="pop">hackathon</span></h1>
+      <div class="mini">THE UNOFFICIAL-⭐OFFICIAL CEREMONY OF ROOKIE HACKS</div>
+      <div class="tt-tip">Add the day's projects, taste each one, and hand out the verdicts.
+        Everything stays on this device — the results are yours.</div>
+    </div>
+    <div class="tt-form">
+      <input type="text" id="ttName" maxlength="40" placeholder="Project name…" autocomplete="off">
+      <select id="ttEmoji" aria-label="cookie type">
+        <option value="🍪">🍪</option><option value="🥐">🥐</option><option value="🧁">🧁</option>
+        <option value="🍩">🍩</option><option value="🥨">🥨</option><option value="🍫">🍫</option>
+        <option value="🍞">🍞</option><option value="🥠">🥠</option><option value="🍰">🍰</option>
+      </select>
+      <button class="rate-btn" id="ttAdd" style="flex:0 0 auto;padding:10px 16px;font-size:clamp(13px,2.4vmin,16px)">+ ADD</button>
+    </div>
+    <div class="tt-list" id="ttList"></div>
+    <button class="btn" id="ttCeremony">🏆 RUN THE AWARDS CEREMONY</button>
+    <button class="btn ghost" id="ttBack">🏠 Back to the bakery</button>
+  </div>
+</div>
+
+<!-- TASTE TEST — CEREMONY -->
+<div class="screen hidden" id="ttDoneScreen">
+  <div class="card">
+    <div class="rankLbl">THE TASTE TEST — RESULTS</div>
+    <div class="vs-face">🏆</div>
+    <div class="rankName" id="ttChampion" style="font-size:clamp(20px,5vmin,34px)">—</div>
+    <div class="podium" id="ttPodium"></div>
+    <div class="hon-list" id="ttHonors"></div>
+    <div class="statRow" id="ttSummary"></div>
+    <button class="btn" id="ttCopy">📋 COPY RESULTS (share with the judge)</button>
+    <button class="btn ghost" id="ttDoneBack">⬅ Back to the ratings</button>
+    <button class="btn ghost" id="ttDoneMenu">🏠 Back to the bakery</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   COOKIE PANIC! — Rookie Bakery Rush
+   A single-file, dependency-free arcade game for the "rookie hacks"
+   hackathon (rookie-hacks.devpost.com). No build step, no assets,
+   no network — everything is drawn with Canvas2D and the audio is
+   synthesized with WebAudio.
+   ===================================================================== */
+
+/* ---------- tiny helpers ---------- */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+const rand = (a,b) => a + Math.random()*(b-a);
+const irand = (a,b) => Math.floor(rand(a,b+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const lerp = (a,b,t) => a+(b-a)*t;
+/* seeded RNG for the Daily Batch (same cookies for everyone) */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function seedFrom(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function dateShort(){const d=new Date();return d.toLocaleDateString("en-US",{month:"short",day:"numeric"});}
+
+/* ---------- canvas ---------- */
+const canvas = $("game"), ctx = canvas.getContext("2d");
+let W=0, H=0, DPR=1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W*DPR); canvas.height = Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", ()=>setTimeout(resize,80));
+resize();
+
+/* ---------- persistence ---------- */
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem("cookiepanic_"+k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem("cookiepanic_"+k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ---------- audio (fully procedural, no assets) ---------- */
+const Sfx = (()=>{
+  let ac=null, master=null, musicGain=null, musicOn=store.get("music",true);
+  let started=false, musicTimer=null, step=0;
+  function ensure(){
+    if(ac) return true;
+    try{
+      ac = new (window.AudioContext||window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = 0.5; master.connect(ac.destination);
+      musicGain = ac.createGain(); musicGain.gain.value = musicOn?0.16:0.0; musicGain.connect(master);
+    }catch(e){ return false; }
+    return true;
+  }
+  function blip(freq, dur, type="sine", vol=0.5, when=0, slideTo=null){
+    if(!ensure()) return;
+    const t = ac.currentTime + when;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20,slideTo), t+dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+dur+0.05);
+  }
+  function noise(dur, vol=0.3, when=0){
+    if(!ensure()) return;
+    const t = ac.currentTime + when;
+    const len = Math.max(1, Math.floor(ac.sampleRate*dur));
+    const buf = ac.createBuffer(1,len,ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len);
+    const src = ac.createBufferSource(); src.buffer=buf;
+    const g = ac.createGain(); g.gain.value=vol;
+    const f = ac.createBiquadFilter(); f.type="highpass"; f.frequency.value=900;
+    src.connect(f); f.connect(g); g.connect(master); src.start(t);
+  }
+  /* public sfx */
+  const api = {
+    unlock(){ if(ensure() && ac.state==="suspended") ac.resume(); },
+    catch(combo){ blip(340*Math.pow(1.045,Math.min(combo,30)), .12, "triangle", .4); },
+    gold(){ [523,659,784,1047].forEach((f,i)=>blip(f,.16,"square",.22,i*.06)); },
+    burnt(){ blip(160,.28,"sawtooth",.35,0,70); noise(.12,.12); },
+    shield(){ blip(660,.1,"sine",.3); blip(880,.12,"sine",.3,.08); },
+    sisu(){ [392,523,659,784,1047,1319].forEach((f,i)=>blip(f,.18,"triangle",.26,i*.07)); },
+    fever(){ [440,554,659,880,1109].forEach((f,i)=>blip(f,.2,"square",.2,i*.05)); },
+    wave(){ blip(523,.12,"triangle",.3); blip(784,.18,"triangle",.3,.1); },
+    miss(){ blip(200,.16,"sine",.18,0,120); },
+    over(){ [392,330,262,196].forEach((f,i)=>blip(f,.3,"triangle",.3,i*.16)); },
+    ui(){ blip(600,.07,"sine",.25); },
+    get musicOn(){ return musicOn; },
+    toggleMusic(){
+      musicOn = !musicOn; store.set("music", musicOn);
+      if(musicGain) musicGain.gain.value = musicOn?0.16:0.0;
+      return musicOn;
+    },
+    /* 8-bit-ish loop: square lead + triangle bass + hat */
+    startMusic(){
+      if(!ensure() || musicTimer) return;
+      const lead=[0,4,7,12, 7,4,0,-5, 0,4,7,12, 14,12,7,4];
+      const bass=[-12,-12,-5,-5, -12,-12,-5,-5, -12,-12,-5,-5, -8,-8,-5,-5];
+      const N = 440*Math.pow(2,-9)/2; /* ~130.8 Hz */
+      const seq = ()=>{
+        if(!musicTimer) return;
+        const i = step%16;
+        const fast = game && game.fever>0 ? 0.6 : 1;
+        if(musicOn){
+          const t=ac.currentTime;
+          const mk=(freq,type,dur,vol)=>{
+            const o=ac.createOscillator(),g=ac.createGain();
+            o.type=type;o.frequency.value=freq;
+            g.gain.setValueAtTime(vol,t);
+            g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+            o.connect(g);g.connect(musicGain);o.start(t);o.stop(t+dur+0.02);
+          };
+          const semitone = game && game.fever>0 ? 3 : 0;
+          mk(N*Math.pow(2,(lead[i]+semitone)/12),"square",.14*fast,.5);
+          if(i%2===0) mk(N*Math.pow(2,(bass[i]+semitone)/12),"triangle",.22*fast,.85);
+          const len=ac.sampleRate*.03, buf=ac.createBuffer(1,len,ac.sampleRate), d=buf.getChannelData(0);
+          for(let j=0;j<len;j++)d[j]=(Math.random()*2-1)*(1-j/len);
+          const s=ac.createBufferSource();s.buffer=buf;
+          const hg=ac.createGain();hg.gain.value=i%4===0?.5:.22;
+          const hp=ac.createBiquadFilter();hp.type="highpass";hp.frequency.value=6000;
+          s.connect(hp);hp.connect(hg);hg.connect(musicGain);s.start(t);
+        }
+        step++;
+        musicTimer=setTimeout(seq, 150*fast);
+      };
+      seq();
+    },
+    stopMusic(){ if(musicTimer){clearTimeout(musicTimer);musicTimer=null;} }
+  };
+  return api;
+})();
+/* ---------- juice: particles, floaters, shake ---------- */
+const juice = {
+  parts:[], floaters:[], shakeT:0, shakeMag:0,
+  reduce: store.get("reduce", window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches),
+  burst(x,y,color,n=12,speed=3,life=0.6,size=4,grav=0.12){
+    if(this.reduce) n=Math.min(n,5);
+    for(let i=0;i<n;i++){
+      const a=rand(0,Math.PI*2), s=rand(speed*0.3,speed);
+      this.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:rand(life*0.5,life),
+                       t:0,color,size:rand(size*0.5,size),grav});
+    }
+  },
+  crumb(x,y,gold){ this.burst(x,y, gold?"#ffd34d":pick(["#c98b4b","#8a5a2b","#f4d9a8","#5b3218"]), 14, 4.2, .7, 5); },
+  steam(x,y){ this.burst(x,y,"#9b9b9b",8,1.6,1.0,7,0.02); },
+  float(x,y,text,color="#ffd34d",big=false){
+    this.floaters.push({x,y,text,color,t:0,life:0.9,big});
+    if(this.floaters.length>24) this.floaters.shift();
+  },
+  shake(mag=6,t=0.25){ if(this.reduce) return; this.shakeMag=Math.max(this.shakeMag,mag); this.shakeT=Math.max(this.shakeT,t); },
+  update(dt){
+    for(let i=this.parts.length-1;i>=0;i--){
+      const p=this.parts[i]; p.t+=dt;
+      if(p.t>=p.life){this.parts.splice(i,1);continue;}
+      p.vy+=p.grav; p.x+=p.vx; p.y+=p.vy;
+    }
+    for(let i=this.floaters.length-1;i>=0;i--){
+      const f=this.floaters[i]; f.t+=dt;
+      if(f.t>=f.life){this.floaters.splice(i,1);continue;}
+      f.y-=34*dt;
+    }
+    if(this.shakeT>0){this.shakeT-=dt; if(this.shakeT<=0)this.shakeMag=0;}
+  },
+  draw(){
+    for(const p of this.parts){
+      ctx.globalAlpha = 1-(p.t/p.life);
+      ctx.fillStyle=p.color;
+      ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+    }
+    ctx.globalAlpha=1;
+    for(const f of this.floaters){
+      const k=1-f.t/f.life;
+      ctx.globalAlpha=Math.min(1,k*2);
+      ctx.font=`bold ${f.big?26:17}px Trebuchet MS, sans-serif`;
+      ctx.textAlign="center";
+      ctx.lineWidth=4; ctx.strokeStyle="rgba(0,0,0,.45)";
+      ctx.strokeText(f.text,f.x,f.y);
+      ctx.fillStyle=f.color; ctx.fillText(f.text,f.x,f.y);
+    }
+    ctx.globalAlpha=1;
+  },
+  clear(){ this.parts.length=0; this.floaters.length=0; this.shakeT=0; this.shakeMag=0; }
+};
+
+/* ---------- sprites (all drawn with Canvas2D, no assets) ---------- */
+const Sprites = {
+  cookie(x,y,r,rot,face=true){
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.fillStyle="#d99b4a"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,r*0.97,0,Math.PI*2);
+    ctx.fillStyle="#f0bd6f"; ctx.fill();
+    /* chips */
+    const chips=[[-.45,-.3,.2],[.4,-.42,.16],[.05,.4,.22],[.45,.32,.15],[-.32,.42,.13],[-.05,-.05,.17],[.28,.05,.12]];
+    ctx.fillStyle="#5b3218";
+    for(const [cx,cy,cr] of chips){ ctx.beginPath(); ctx.arc(cx*r,cy*r,cr*r,0,Math.PI*2); ctx.fill(); }
+    if(face){
+      ctx.fillStyle="#3a2415";
+      ctx.beginPath(); ctx.arc(-r*.34,-r*.18,r*.11,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r*.34,-r*.18,r*.11,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle="#3a2415"; ctx.lineWidth=Math.max(1.5,r*.09); ctx.lineCap="round";
+      ctx.beginPath(); ctx.arc(0,r*.12,r*.28,0.25*Math.PI,0.75*Math.PI); ctx.stroke();
+    }
+    ctx.restore();
+  },
+  gold(x,y,r,rot){
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+    const g=ctx.createRadialGradient(-r*.3,-r*.3,r*.2,0,0,r);
+    g.addColorStop(0,"#fff3b0"); g.addColorStop(.55,"#ffd34d"); g.addColorStop(1,"#e09a1f");
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.65)"; ctx.lineWidth=Math.max(1,r*.08);
+    ctx.beginPath(); ctx.arc(0,0,r*.82,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle="#a8641a";
+    for(const [cx,cy,cr] of [[-.4,-.28,.18],[.42,-.35,.14],[.05,.38,.2],[.36,.3,.12]]){
+      ctx.beginPath(); ctx.arc(cx*r,cy*r,cr*r,0,Math.PI*2); ctx.fill();
+    }
+    /* star sparkle */
+    ctx.fillStyle="rgba(255,255,255,.9)";
+    ctx.save(); ctx.rotate(rot*-2);
+    for(let i=0;i<4;i++){ ctx.rotate(Math.PI/2); ctx.beginPath();
+      ctx.moveTo(0,-r*1.35); ctx.lineTo(r*.14,-r*1.05); ctx.lineTo(-r*.14,-r*1.05); ctx.closePath(); ctx.fill(); }
+    ctx.restore(); ctx.restore();
+  },
+  burnt(x,y,r,rot){
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.fillStyle="#2e2018"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,r*.9,0,Math.PI*2);
+    ctx.fillStyle="#3b2b22"; ctx.fill();
+    ctx.fillStyle="#1c130d";
+    for(const [cx,cy,cr] of [[-.4,-.3,.2],[.42,-.35,.15],[.02,.4,.2],[.34,.3,.13]]){
+      ctx.beginPath(); ctx.arc(cx*r,cy*r,cr*r,0,Math.PI*2); ctx.fill();
+    }
+    /* X eyes + wobble frown */
+    ctx.strokeStyle="#ff7a5c"; ctx.lineWidth=Math.max(1.5,r*.1); ctx.lineCap="round";
+    const e=r*.16;
+    for(const sx of [-r*.34,r*.34]){
+      ctx.beginPath();
+      ctx.moveTo(sx-e,-r*.3-e); ctx.lineTo(sx+e,-r*.3+e);
+      ctx.moveTo(sx+e,-r*.3-e); ctx.lineTo(sx-e,-r*.3+e);
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(0,r*.42,r*.26,1.2*Math.PI,1.8*Math.PI); ctx.stroke();
+    ctx.restore();
+  },
+  milk(x,y,r,rot){
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot*0.5);
+    const w=r*1.05, h=r*1.35;
+    ctx.fillStyle="#f4f7ff";
+    ctx.fillRect(-w/2,-h/2,w,h);
+    ctx.fillStyle="#4d7cf0"; ctx.fillRect(-w/2,-h/2,w,h*.3);
+    ctx.fillStyle="#fff";
+    ctx.font=`bold ${r*.5}px Trebuchet MS`; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("MILK",0,h*.18);
+    ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1.5;
+    ctx.strokeRect(-w/2,-h/2,w,h);
+    ctx.restore();
+  },
+  sisu(x,y,r,rot){
+    /* Nordic cinnamon bun (korvapuusti) — a wink to Helsinki */
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot*0.4);
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.fillStyle="#c98b4b"; ctx.fill();
+    ctx.strokeStyle="#8a5a2b"; ctx.lineWidth=Math.max(2,r*.16);
+    ctx.beginPath();
+    for(let a=0;a<Math.PI*6;a+=.25){
+      const rr=r*(1-a/(Math.PI*6.5));
+      const px=Math.cos(a)*rr, py=Math.sin(a)*rr;
+      a===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,.75)";
+    for(let i=0;i<5;i++){ ctx.beginPath();
+      ctx.arc(rand(-r*.6,r*.6),rand(-r*.6,r*.6),r*.06,0,Math.PI*2); ctx.fill(); }
+    ctx.restore();
+  },
+  tray(x,y,w,pad,shield,mitt){
+    const h=Math.max(14,w*0.13);
+    ctx.save(); ctx.translate(x,y);
+    /* back lip */
+    ctx.fillStyle="#5a6270";
+    ctx.beginPath();
+    ctx.moveTo(-w/2, -h*0.9); ctx.lineTo(w/2,-h*0.9);
+    ctx.lineTo(w/2-6, h*0.2); ctx.lineTo(-w/2+6, h*0.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#7b8494";
+    ctx.fillRect(-w/2,-h*0.9,w,h*0.45);
+    ctx.fillStyle="rgba(255,255,255,.25)";
+    ctx.fillRect(-w/2+4,-h*0.8,w-8,h*0.16);
+    /* mitt hand (player colour) */
+    ctx.fillStyle=mitt||"#e4586b";
+    ctx.beginPath(); ctx.arc(0,h*0.9,Math.max(8,w*0.07),0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,.35)";
+    ctx.beginPath(); ctx.arc(0,h*0.9,Math.max(5,w*0.045),0,Math.PI*2); ctx.fill();
+    if(shield){
+      ctx.strokeStyle="rgba(140,200,255,.85)"; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(0,-h*0.2,w*0.62,Math.PI*1.05,Math.PI*1.95); ctx.stroke();
+      ctx.strokeStyle="rgba(200,235,255,.5)"; ctx.lineWidth=8;
+      ctx.beginPath(); ctx.arc(0,-h*0.2,w*0.72,Math.PI*1.1,Math.PI*1.9); ctx.stroke();
+    }
+    if(pad){ ctx.restore(); return; }
+    ctx.restore();
+  }
+};
+/* ---------- achievements ---------- */
+const ACH = {
+  first:   {icon:"🍪", name:"First Batch"},
+  combo10: {icon:"🔥", name:"Combo ×10"},
+  combo25: {icon:"🌋", name:"Combo ×25"},
+  fever:   {icon:"✨", name:"Fever Dream"},
+  sisu:    {icon:"🥐", name:"Sisu! (Helsinki hello)"},
+  score5k: {icon:"🏆", name:"5,000 Club"},
+  wave5:   {icon:"🌊", name:"Wave 5 Survivor"},
+  legend:  {icon:"👑", name:"Cookie Legend"},
+};
+function unlock(id){
+  const have=store.get("ach",[]);
+  if(have.includes(id)) return;
+  have.push(id); store.set("ach",have);
+  const a=ACH[id];
+  if(game && game.state==="play"){
+    juice.float(W/2, H*0.4, a.icon+" "+a.name, "#7ef0c1", true);
+    Sfx.gold();
+  }
+}
+
+/* ---------- game ---------- */
+const game = {
+  state:"menu",            /* menu | play | pause | over | vs-over */
+  mode:"solo",             /* solo | versus */
+  demo:false,
+  daily:"",                /* set when playing today's Daily Batch */
+  dailyFull:"",            /* YYYY-MM-DD */
+  rng:Math.random,         /* seeded in Daily Batch mode */
+  /* player 1 (solo uses these too) */
+  score:0, combo:0, bestCombo:0, comboTimer:0,
+  lives:3, wave:1, waveT:0, waveLen:26,
+  fever:0, feverMax:9,
+  shield:false, stun:0,
+  cookies:0,
+  items:[], spawnT:0, spawnGap:0.9,
+  trayX:0, trayW:0, targetX:0,
+  itemsCaught:0, itemsDodged:0,
+  flour:[],
+  /* player 2 + versus */
+  p2:{score:0, combo:0, bestCombo:0, trayX:0, targetX:0, shield:false, fever:0, stun:0, cookies:0},
+  vsLen:60, vsT:60, warned10:false,
+
+  reset(mode, demo=false){
+    mode = mode||"solo";
+    if(mode==="daily"){
+      this.dailyFull=todayStr();
+      this.daily=dateShort();
+      this.rng=mulberry32(seedFrom(this.dailyFull));
+      mode="solo"; /* daily is a solo run with a seeded oven */
+    } else {
+      this.daily=""; this.dailyFull=""; this.rng=Math.random;
+    }
+    this.state="play"; this.mode=mode; this.demo = mode==="solo" ? demo : false;
+    this.score=0; this.combo=0; this.bestCombo=0; this.comboTimer=0;
+    this.lives=3; this.wave=1; this.waveT=0;
+    this.fever=0; this.shield=false; this.stun=0; this.cookies=0;
+    this.items.length=0; this.spawnT=0.5;
+    this.trayW = mode==="versus" ? clamp(Math.min(W*0.26,140),100,150)
+                                 : clamp(Math.min(W*0.3,150),110,170);
+    this.trayX = mode==="versus" ? W*0.28 : W/2;
+    this.targetX=this.trayX;
+    this.p2={score:0, combo:0, bestCombo:0, trayX:W*0.72, targetX:W*0.72,
+             shield:false, fever:0, stun:0, cookies:0};
+    this.vsT=this.vsLen; this.warned10=false;
+    this.itemsCaught=0; this.itemsDodged=0;
+    this.flour.length=0;
+    if(!juice.reduce) for(let i=0;i<26;i++)
+      this.flour.push({x:rand(0,W),y:rand(0,H),r:rand(1,3.4),v:rand(6,20),drift:rand(-8,8)});
+    juice.clear();
+    HUD.refresh();
+    UI.hideAll();
+    Sfx.startMusic();
+    if(mode==="versus")
+      this.announce("COOKIE DUEL!","🔴 red tray vs 🔵 blue tray — steal everything!",true);
+    else if(this.daily)
+      this.announce("DAILY BATCH · "+this.daily,"same cookies for everyone today!",true);
+    else
+      this.announce(demo? "LOW / NO-CODE MODE" : "WAVE 1",
+                    demo? "the bakery runs itself — enjoy the show" : "the oven is heating up…", true);
+  },
+
+  announce(t1,t2,big=false){
+    const el=$("toast");
+    el.querySelector(".t1").textContent=t1;
+    el.querySelector(".t2").textContent=t2||"";
+    el.classList.add("show");
+    clearTimeout(this._toastT);
+    this._toastT=setTimeout(()=>el.classList.remove("show"), big?1600:1200);
+  },
+
+  comboMult(c){ c=c===undefined?this.combo:c; return c>=25?4 : c>=10?3 : c>=5?2 : 1; },
+
+  gr(a,b){ return a + this.rng()*(b-a); },   /* gameplay randomness (seeded in Daily) */
+
+  spawn(){
+    const vs = this.mode==="versus";
+    const waveK = 1 + (this.wave-1)*(vs?0.10:0.16);
+    const r=this.rng();
+    let kind="cookie";
+    const pBurnt = vs ? 0.16 : clamp(0.10+this.wave*0.028,0.10,0.34);
+    const pGold=vs?0.06:0.05, pMilk=0.055, pSisu=0.018;
+    if(r<pBurnt) kind="burnt";
+    else if(r<pBurnt+pGold) kind="gold";
+    else if(r<pBurnt+pGold+pMilk) kind="milk";
+    else if(r<pBurnt+pGold+pMilk+pSisu) kind="sisu";
+    const rad = kind==="milk"?this.gr(15,20):this.gr(17,24);
+    this.items.push({
+      kind, x:this.gr(rad+8,W-rad-8), y:-30, r:rad,
+      vy:this.gr(120,165)*waveK, vx:this.gr(-26,26),
+      rot:this.gr(0,Math.PI*2), vr:this.gr(-2.2,2.2),
+      wobble:this.gr(0,Math.PI*2)
+    });
+  },
+
+  spawnGapCalc(){
+    if(this.mode==="versus") return this.gr(0.34,0.62);
+    const base = Math.max(0.34, 0.95 - (this.wave-1)*0.085);
+    return base*this.gr(0.75,1.3);
+  },
+
+  loseLife(){
+    if(this.shield){
+      this.shield=false; Sfx.shield();
+      juice.float(this.trayX, H-70, "SHIELD BROKE!", "#8cc8ff", true);
+      juice.burst(this.trayX,H-60,"#8cc8ff",16,4,.6,5);
+      return;
+    }
+    this.lives--; this.combo=0;
+    Sfx.burnt(); juice.shake(9,.32);
+    HUD.refresh();
+    if(this.lives<=0) this.gameOver();
+  },
+
+  /* who: 0 = P1/red, 1 = P2/blue (solo is always 0) */
+  catch(it, who){
+    const P = who===1 ? this.p2 : this;
+    const vs = this.mode==="versus";
+    const whoName = who===1 ? "🔵" : vs ? "🔴" : "";
+    switch(it.kind){
+      case "cookie": {
+        P.combo++; P.bestCombo=Math.max(P.bestCombo,P.combo);
+        if(!vs) this.comboTimer=2.6;
+        const mult=this.comboMult(P.combo), fev=P.fever>0?3:1;
+        const pts=Math.round(10*mult*fev);
+        P.score+=pts; P.cookies++;
+        Sfx.catch(P.combo);
+        juice.crumb(it.x,it.y,false);
+        juice.float(it.x,it.y-14,(vs?whoName+" ":"")+"+"+pts+(mult>1?"  ×"+mult:""),
+                    P.fever>0?"#7ef0c1":"#ffd34d", P.fever>0);
+        if(P.combo===1) unlock("first");
+        if(P.combo>=10) unlock("combo10");
+        if(P.combo>=25) unlock("combo25");
+        break;
+      }
+      case "gold":
+        P.fever=this.feverMax; Sfx.gold(); Sfx.fever();
+        P.score+=50; P.cookies++;
+        juice.crumb(it.x,it.y,true);
+        juice.burst(it.x,it.y,"#ffd34d",26,5.5,.8,5);
+        juice.float(it.x,it.y-16,(vs?whoName+" ":"")+"FEVER! +50","#ffd34d",true);
+        juice.shake(5,.2);
+        unlock("fever");
+        break;
+      case "milk":
+        P.shield=true; Sfx.shield();
+        juice.float(it.x,it.y-14,(vs?whoName+" ":"")+"SHIELD UP!","#8cc8ff");
+        juice.burst(it.x,it.y,"#cfe4ff",14,3.4,.6,4);
+        break;
+      case "sisu":
+        P.score+=200; Sfx.sisu();
+        juice.float(it.x,it.y-16,(vs?whoName+" ":"")+"SISU! +200","#7ef0c1",true);
+        juice.burst(it.x,it.y,"#c98b4b",24,5,.9,5);
+        juice.shake(4,.2);
+        unlock("sisu");
+        break;
+      case "burnt":
+        if(vs){
+          if(P.shield){
+            P.shield=false; Sfx.shield();
+            juice.float(it.x,it.y-16,whoName+" SHIELD BROKE!","#8cc8ff",true);
+          } else {
+            P.score=Math.max(0,P.score-15); P.combo=0; P.stun=0.8;
+            Sfx.burnt(); juice.shake(7,.28);
+            juice.float(it.x,it.y-16,whoName+" BURNT! −15 & stunned","#ff7a5c",true);
+          }
+        } else this.loseLife();
+        break;
+    }
+    this.itemsCaught++;
+    if(this.score>=5000 || this.p2.score>=5000) unlock("score5k");
+    HUD.refresh();
+  },
+
+  update(dt){
+    if(this.state!=="play") return;
+    const vs = this.mode==="versus";
+    if(vs){
+      this.vsT-=dt;
+      if(!this.warned10 && this.vsT<=10){
+        this.warned10=true; this.announce("10 SECONDS!","last batch of the day!",true);
+        $("vsTimer").classList.add("hot"); Sfx.wave();
+      }
+      if(this.vsT<=0){ this.endVersus(); return; }
+      /* heat rises through the round */
+      const wave = 1+Math.floor((this.vsLen-this.vsT)/15);
+      if(wave!==this.wave){ this.wave=wave; }
+      /* player timers */
+      if(this.fever>0) this.fever-=dt;
+      if(this.p2.fever>0) this.p2.fever-=dt;
+      if(this.stun>0) this.stun-=dt;
+      if(this.p2.stun>0) this.p2.stun-=dt;
+    } else {
+      this.waveT+=dt;
+      if(this.waveT>=this.waveLen){
+        this.waveT=0; this.wave++;
+        Sfx.wave();
+        const msgs=["the oven is heating up…","cookies incoming — faster!","the baker's pace quickens","crumbs everywhere!","you can smell the victory","legendary oven territory"];
+        this.announce("WAVE "+this.wave, msgs[Math.min(this.wave-2,msgs.length-1)]||"insane bakery hours");
+        if(this.wave>=5) unlock("wave5");
+        HUD.refresh();
+      }
+      if(this.fever>0){
+        this.fever-=dt;
+        if(this.fever<=0){ this.fever=0; this.announce("FEVER OVER","nice bake 👌"); }
+      }
+      if(this.comboTimer>0){
+        this.comboTimer-=dt;
+        if(this.comboTimer<=0 && this.combo>0){ this.combo=0; HUD.refresh(); }
+      }
+    }
+    /* spawning */
+    this.spawnT-=dt;
+    if(this.spawnT<=0){
+      this.spawn();
+      if((vs&&this.rng()<0.30) || (!vs&&this.wave>=3&&this.rng()<0.16)) this.spawn();
+      this.spawnT=this.spawnGapCalc();
+    }
+    /* demo AI: chase nearest safe item, dodge burnt (solo only) */
+    if(this.demo){
+      let best=null, bestD=1e9;
+      for(const it of this.items){
+        if(it.y<it.r*2) continue;
+        const d=Math.abs(it.x-this.trayX)+(H-it.y)*0.25;
+        if(it.kind==="burnt"){
+          if(Math.abs(it.x-this.trayX)<this.trayW*0.7 && it.y>H*0.55){
+            this.targetX = this.trayX + (it.x>this.trayX?-1:1)*this.trayW*1.4;
+            return this.step(dt);
+          }
+          continue;
+        }
+        if(d<bestD){bestD=d;best=it;}
+      }
+      if(best) this.targetX=best.x;
+    }
+    this.step(dt);
+  },
+
+  step(dt){
+    const vs = this.mode==="versus";
+    const k = 1-Math.pow(0.0008, dt);
+    this.trayX = lerp(this.trayX, clamp(this.targetX, this.trayW/2+4, W-this.trayW/2-4), k);
+    if(vs) this.p2.trayX = lerp(this.p2.trayX,
+        clamp(this.p2.targetX, this.trayW/2+4, W-this.trayW/2-4), k);
+    const trayTop = H-74;
+    for(let i=this.items.length-1;i>=0;i--){
+      const it=this.items[i];
+      it.y+=it.vy*dt; it.x+=it.vx*dt; it.rot+=it.vr*dt;
+      it.wobble+=dt*6;
+      if(it.x<it.r||it.x>W-it.r) it.vx*=-1;
+      if(it.y+it.r>=trayTop && it.y-it.r<=trayTop+26){
+        /* catch zone: which tray? (closest wins; stunned trays can't catch) */
+        const p1ok = Math.abs(it.x-this.trayX)<this.trayW/2+it.r*0.55 && this.stun<=0;
+        const p2ok = vs && Math.abs(it.x-this.p2.trayX)<this.trayW/2+it.r*0.55 && this.p2.stun<=0;
+        if(p1ok && p2ok){
+          const d1=Math.abs(it.x-this.trayX), d2=Math.abs(it.x-this.p2.trayX);
+          this.items.splice(i,1); this.catch(it, d1<=d2?0:1); continue;
+        }
+        if(p1ok){ this.items.splice(i,1); this.catch(it,0); continue; }
+        if(p2ok){ this.items.splice(i,1); this.catch(it,1); continue; }
+      }
+      /* missed → floor */
+      if(it.y-it.r>H+8){
+        this.items.splice(i,1);
+        if(!vs && it.kind!=="burnt" && it.kind!=="milk"){
+          if(this.combo>=5){ juice.float(it.x,H-96,"combo lost!","#ff9e7a"); }
+          this.combo=0; Sfx.miss(); HUD.refresh();
+        }
+      }
+    }
+  },
+
+  gameOver(){
+    this.state="over";
+    Sfx.stopMusic(); Sfx.over();
+    juice.shake(10,.4);
+    let isBest=false, dailyBest=null;
+    if(this.daily){
+      const k="daily_"+this.dailyFull, prev=store.get(k,0);
+      dailyBest=Math.max(prev,this.score);
+      if(this.score>prev){ store.set(k,this.score); isBest=true; }
+    } else {
+      const best=store.get("best",0);
+      isBest=this.score>best;
+      if(isBest) store.set("best",this.score);
+    }
+    const L=store.get("ledger",{bakes:0,cookies:0,duels:0});
+    L.bakes++; L.cookies+=this.cookies; store.set("ledger",L);
+    if(this.score>=7000) unlock("legend");
+    UI.showOver(isBest,dailyBest);
+  },
+
+  endVersus(){
+    this.state="vs-over";
+    Sfx.stopMusic(); Sfx.over();
+    juice.shake(8,.35);
+    const L=store.get("ledger",{bakes:0,cookies:0,duels:0});
+    L.duels++; L.cookies+=this.cookies+this.p2.cookies; store.set("ledger",L);
+    if(this.score>=7000 || this.p2.score>=7000) unlock("legend");
+    UI.showVs();
+  }
+};
+
+/* ---------- HUD ---------- */
+const HUD = {
+  refresh(){
+    const vs = game.mode==="versus";
+    const inPlay = game.state==="play" || game.state==="pause";
+    $("scoreVal").textContent = game.score.toLocaleString();
+    $("scoreLbl").innerHTML = vs ? 'RED TRAY <span class="p1col">P1</span>' : "SCORE";
+    $("scoreVal").style.color = vs ? "#ff9e9e" : "";
+    $("waveLbl").textContent = vs ? "" : (game.daily ? "Daily "+game.daily : "Wave "+game.wave);
+    $("livesBox").classList.toggle("hidden", vs);
+    $("p2Box").classList.toggle("hidden", !vs);
+    if(vs) $("p2Val").textContent = game.p2.score.toLocaleString();
+    /* versus countdown */
+    const vt=$("vsTimer");
+    if(vs && inPlay){
+      vt.classList.remove("hidden");
+      vt.querySelector(".t").textContent = Math.max(0,Math.ceil(game.vsT));
+      if(game.vsT>10) vt.classList.remove("hot");
+    } else { vt.classList.add("hidden"); vt.classList.remove("hot"); }
+    /* hearts (solo) */
+    if(!vs){
+      const hearts=$("livesBox");
+      hearts.innerHTML="";
+      for(let i=0;i<3;i++){
+        const s=document.createElement("span");
+        s.textContent = i<game.lives ? "🍪" : "🖤";
+        s.style.filter = i<game.lives ? "drop-shadow(0 2px 2px rgba(0,0,0,.4))" : "opacity:.55";
+        hearts.appendChild(s);
+      }
+    }
+    const cw=$("comboWrap");
+    if(!vs && game.combo>=2){
+      cw.classList.add("on");
+      $("comboLbl").textContent="COMBO ×"+game.comboMult()+"  ("+game.combo+")";
+      $("comboFill").style.width=(clamp(game.comboTimer/2.6,0,1)*100)+"%";
+    } else cw.classList.remove("on");
+    const fb=$("feverBar");
+    if(!vs && game.fever>0){ fb.style.display="block"; $("feverFill").style.width=(game.fever/game.feverMax*100)+"%"; }
+    else fb.style.display="none";
+  }
+};
+
+/* ---------- UI screens ---------- */
+const UI = {
+  SCREENS:["startScreen","pauseScreen","overScreen","vsScreen","ttScreen","ttDoneScreen"],
+  hideAll(){ for(const id of this.SCREENS) $(id).classList.add("hidden"); },
+  showStart(){
+    this.hideAll(); $("startScreen").classList.remove("hidden");
+    const b=store.get("best",0);
+    $("hsLine").textContent = b>0 ? ("\uD83C\uDF6E Best batch: "+b.toLocaleString()+" \u2014 can you beat it?") : "No batches baked yet \u2014 be the first rookie!";
+    const db=store.get("daily_"+todayStr(),0);
+    $("dailyLbl").textContent = dateShort()+(db>0 ? " \u00B7 best "+db.toLocaleString() : " \u00B7 same cookies for everyone");
+    const L=store.get("ledger",{bakes:0,cookies:0,duels:0});
+    $("ledgerLine").textContent = (L.bakes||L.duels)
+      ? "\uD83D\uDCCB Ledger: "+L.bakes+" bakes \u00B7 "+L.cookies.toLocaleString()+" cookies caught \u00B7 "+L.duels+" duels"
+      : "";
+    $("btnMute").textContent = Sfx.musicOn ? "\uD83D\uDD0A" : "\uD83D\uDD07";
+    HUD.refresh();
+  },
+  showPause(){ if(game.state!=="play")return; game.state="pause"; $("pauseScreen").classList.remove("hidden"); },
+  resume(){ if(game.state!=="pause")return; game.state="play"; $("pauseScreen").classList.add("hidden"); },
+  showOver(isBest, dailyBest){
+    this.hideAll(); $("overScreen").classList.remove("hidden");
+    /* rank tiers: Nate's verdict grows with the score */
+    const LQ="\u201c", RQ="\u201d", DASH="\u2014";
+    const tiers=[
+      {min:0,    rank:"Raw Dough",    face:"\uD83D\uDE33", good:"\u2026",  cool:"\u2026",  q:LQ+"I\u2026 admire the enthusiasm?"+RQ+" "+DASH+" Nate pokes the dough politely."},
+      {min:500,  rank:"Rookie Baker", face:"\uD83D\uDE42", good:"\u2713",  cool:"~",      q:LQ+"Edible. Promising crumbs. The rookie makes cookies!"+RQ+" "+DASH+" Nate nods."},
+      {min:1500, rank:"Rising Star",  face:"\uD83D\uDE04", good:"\u2713",  cool:"\u2713", q:LQ+"Now THIS is a batch. Soft centre, crisp edges."+RQ+" "+DASH+" Nate reaches for more."},
+      {min:3500, rank:"Head Chef",    face:"\uD83E\uDD29", good:"\u2713\u2713", cool:"\u2713\u2713", q:LQ+"Bakery-quality. I can\u2019t stop eating these."+RQ+" "+DASH+" Nate, mid-cookie."},
+      {min:7000, rank:"COOKIE LEGEND",face:"\uD83E\uDEE1", good:"\u2713\u2713\u2713", cool:"\u2713\u2713\u2713", q:LQ+"I came to judge a hackathon and left with a new career."+RQ+" "+DASH+" Nate bows."},
+    ];
+    let t=tiers[0];
+    for(const x of tiers) if(game.score>=x.min) t=x;
+    $("judgeFace").textContent=t.face;
+    $("rankName").textContent=t.rank;
+    $("quip").textContent=t.q;
+    $("vGood").textContent=t.good; $("vGood").className = t.good.indexOf("\u2713")>=0?"yes":"no";
+    $("vCool").textContent=t.cool; $("vCool").className = t.cool.indexOf("\u2713")>=0?"yes":"no";
+    $("fScore").textContent=game.score.toLocaleString();
+    $("fCombo").textContent="\u00D7"+(game.bestCombo||1);
+    $("fCookies").textContent=game.cookies;
+    $("fWave").textContent=game.wave;
+    $("bestLine").innerHTML = game.daily
+      ? (isBest
+          ? '<span class="newbest">\u2605 NEW BEST TODAY! '+game.score.toLocaleString()+' \u2605</span>'
+          : "Today's best: "+(dailyBest||0).toLocaleString())
+      : (isBest
+          ? '<span class="newbest">\u2605 NEW BEST BATCH! '+game.score.toLocaleString()+' \u2605</span>'
+          : "Best batch so far: "+store.get("best",0).toLocaleString());
+    const have=store.get("ach",[]), list=$("achList");
+    list.innerHTML="";
+    for(const [id,a] of Object.entries(ACH)){
+      const el=document.createElement("span");
+      el.className="ach"+(have.indexOf(id)>=0?"":" locked");
+      el.textContent=a.icon+" "+a.name;
+      list.appendChild(el);
+    }
+  },
+  showVs(){
+    this.hideAll(); $("vsScreen").classList.remove("hidden");
+    const p1=game.score, p2=game.p2.score;
+    let winner, quip;
+    if(p1===p2){
+      winner="SPLIT THE BATCH! \uD83E\uDD1D";
+      quip="A tie so perfect they had to share the last cookie. Nate applauds.";
+    } else if(p1>p2){
+      winner="\uD83D\uDD34 RED TRAY WINS!";
+      quip=(p1-p2>=300) ? "Blue got out-baked. It was not close." : "A crumb-thin victory for red!";
+    } else {
+      winner="\uD83D\uDD35 BLUE TRAY WINS!";
+      quip=(p2-p1>=300) ? "Red got out-baked. It was not close." : "A crumb-thin victory for blue!";
+    }
+    $("vsFace").textContent = p1===p2 ? "\uD83E\uDD1D" : "\uD83D\uDC51";
+    $("vsWinner").textContent = winner;
+    $("vsQuip").textContent = quip;
+    $("vsP1").textContent = p1.toLocaleString();
+    $("vsP2").textContent = p2.toLocaleString();
+    const rate=(elG,elC,score,isWin)=>{
+      const g = isWin ? "\u2713\u2713" : (score>=150 ? "\u2713" : "\u2026");
+      const c = isWin ? "\u2713\u2713" : (score>=60 ? "\u2713" : "\u2026");
+      $(elG).textContent=g; $(elC).textContent=c;
+      $(elG).className=g.indexOf("\u2713")>=0?"yes":"no";
+      $(elC).className=c.indexOf("\u2713")>=0?"yes":"no";
+    };
+    const tie=(p1===p2);
+    rate("vsG1","vsC1",p1, tie||p1>p2);
+    rate("vsG2","vsC2",p2, tie||p2>p1);
+  },
+  openTaste(){
+    this.hideAll(); $("ttScreen").classList.remove("hidden");
+    game.state="menu";
+    TasteTest.render();
+  }
+};
+
+/* ---------- The Taste Test (judging ceremony, pure DOM) ---------- */
+const TasteTest = {
+  entries(){ return store.get("tt", []); },
+  save(list){ store.set("tt", list); },
+  seed(){
+    if(store.get("tt_seeded",false) || this.entries().length) return;
+    this.save([{id:Date.now(), name:"COOKIE PANIC! — Rookie Bakery Rush", emoji:"🍪", good:true, cool:true}]);
+    store.set("tt_seeded", true);
+  },
+  add(){
+    const name=$("ttName").value.trim();
+    if(!name){ Sfx.miss(); $("ttName").focus(); return; }
+    const list=this.entries();
+    list.push({id:Date.now()+Math.floor(rand(0,999)), name, emoji:$("ttEmoji").value, good:false, cool:false});
+    this.save(list);
+    $("ttName").value=""; $("ttName").focus();
+    Sfx.catch(3); this.render();
+  },
+  del(id){
+    this.save(this.entries().filter(e=>e.id!==id));
+    Sfx.miss(); this.render();
+  },
+  toggle(id, field){
+    const list=this.entries();
+    const e=list.find(x=>x.id===id);
+    if(!e) return;
+    e[field]=!e[field];
+    this.save(list);
+    Sfx.ui(); this.render();
+  },
+  render(){
+    const list=this.entries(), box=$("ttList");
+    box.innerHTML="";
+    if(!list.length){
+      box.innerHTML='<div class="tt-empty">No projects on the tasting table yet.<br>Add the day’s hacks below 👇</div>';
+      return;
+    }
+    for(const e of list){
+      const row=document.createElement("div"); row.className="tt-item";
+      const emo=document.createElement("span"); emo.className="emo"; emo.textContent=e.emoji;
+      const nm=document.createElement("span"); nm.className="nm"; nm.textContent=e.name;
+      const bg=document.createElement("button");
+      bg.className="rate-btn"+(e.good?" on-good":"");
+      bg.textContent="good? "+(e.good?"✓":"·");
+      bg.onclick=()=>this.toggle(e.id,"good");
+      const bc=document.createElement("button");
+      bc.className="rate-btn"+(e.cool?" on-cool":"");
+      bc.textContent="cool? "+(e.cool?"✓":"·");
+      bc.onclick=()=>this.toggle(e.id,"cool");
+      const del=document.createElement("button");
+      del.className="tt-del"; del.textContent="✕"; del.title="remove";
+      del.onclick=()=>this.del(e.id);
+      row.append(emo,nm,bg,bc,del);
+      box.appendChild(row);
+    }
+  },
+  ceremony(){
+    const list=this.entries().filter(e=>e.good||e.cool);
+    if(!list.length){ Sfx.miss(); game.announce("NOTHING TASTED YET","rate at least one project good? or cool?",true); return; }
+    const pts=e=>(e.good?1:0)+(e.cool?1:0);
+    const sorted=[...list].sort((a,b)=>pts(b)-pts(a) || (b.good?1:0)-(a.good?1:0));
+    const podium=$("ttPodium"); podium.innerHTML="";
+    const medals=["🥇","🥈","🥉"], cls=["first","second","third"];
+    const top3=sorted.slice(0,3);
+    /* display order: 2nd, 1st, 3rd */
+    const order=[top3[1],top3[0],top3[2]].filter(Boolean);
+    order.forEach(p=>{
+      const idx=sorted.indexOf(p);
+      const el=document.createElement("div");
+      el.className="pod "+cls[Math.min(idx,2)];
+      el.innerHTML=`<div class="medal">${medals[Math.min(idx,2)]}</div>
+                    <div class="pn">${p.emoji} ${escapeHtml(p.name)}</div>
+                    <div class="pv">${pts(p)*50} pts · good?${p.good?"✓":"·"} cool?${p.cool?"✓":"·"}</div>`;
+      podium.appendChild(el);
+    });
+    $("ttChampion").textContent = "🥇 "+sorted[0].name;
+    const honors=sorted.slice(3);
+    $("ttHonors").textContent = honors.length
+      ? "Participation cookies 🍪 — "+honors.map(e=>e.name).join(" · ")
+      : "";
+    $("ttSummary").innerHTML =
+      `<span><b>${list.length}</b> tasted</span>`+
+      (list.filter(e=>e.good).length?` <span><b>${list.filter(e=>e.good).length}</b> good ✓</span>`:"")+
+      (list.filter(e=>e.cool).length?` <span><b>${list.filter(e=>e.cool).length}</b> cool ✓</span>`:"");
+    UI.hideAll(); $("ttDoneScreen").classList.remove("hidden");
+    Sfx.sisu(); this.confetti(90);
+  },
+  copyResults(){
+    const list=this.entries().filter(e=>e.good||e.cool);
+    const pts=e=>(e.good?1:0)+(e.cool?1:0);
+    const sorted=[...list].sort((a,b)=>pts(b)-pts(a));
+    const lines=["THE TASTE TEST — rookie hacks results 🍪","","What did Nate (or anyone) really think?"];
+    sorted.forEach((e,i)=>{
+      lines.push(`${i+1}. ${e.emoji} ${e.name} — good? ${e.good?"✓":"·"}  cool? ${e.cool?"✓":"·"}  (${pts(e)*50} pts)`);
+    });
+    lines.push("","judged with COOKIE PANIC! — The Rookie Bakery (one HTML file, zero installs)");
+    const text=lines.join("\n");
+    const done=()=>{ $("ttCopy").textContent="✓ COPIED!"; setTimeout(()=>$("ttCopy").textContent="📋 COPY RESULTS (share with the judge)",1600); };
+    if(navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(text).then(done).catch(()=>this.fallbackCopy(text,done));
+    else this.fallbackCopy(text,done);
+  },
+  fallbackCopy(text,done){
+    const ta=document.createElement("textarea");
+    ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); done(); }
+    catch(e){ window.prompt("Copy the results:", text); }
+    document.body.removeChild(ta);
+  },
+  confetti(n){
+    if(juice.reduce) n=Math.min(n,20);
+    const colors=["#ffd34d","#e4586b","#4d7cf0","#7ef0c1","#c98b4b","#fff6e8"];
+    for(let i=0;i<n;i++){
+      const c=document.createElement("div");
+      c.className="confetti";
+      c.style.left=rand(0,100)+"vw";
+      c.style.width=rand(5,11)+"px";
+      c.style.height=rand(6,14)+"px";
+      c.style.background=pick(colors);
+      c.style.animationDuration=rand(1.6,3.6)+"s";
+      c.style.animationDelay=rand(0,0.8)+"s";
+      document.body.appendChild(c);
+      setTimeout(()=>c.remove(), 4600);
+    }
+  }
+};
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+/* ---------- Baker Card (shareable result image) ---------- */
+const BakerCard = {
+  chip(x,cx,cy,r){
+    x.save();
+    x.fillStyle="#c98b4b"; x.beginPath(); x.arc(cx,cy,r,0,Math.PI*2); x.fill();
+    x.fillStyle="#5b3218";
+    for(const [dx,dy] of [[-.35,-.2],[.25,-.35],[.4,.25],[-.1,.4],[.05,-.05]]){
+      x.beginPath(); x.arc(cx+dx*r, cy+dy*r, r*.14, 0, Math.PI*2); x.fill();
+    }
+    x.restore();
+  },
+  make(o){
+    const c=document.createElement("canvas"); c.width=1000; c.height=700;
+    const x=c.getContext("2d");
+    const g=x.createLinearGradient(0,0,0,700);
+    g.addColorStop(0,"#fff6e8"); g.addColorStop(1,"#f2dcb6");
+    x.fillStyle=g; x.fillRect(0,0,1000,700);
+    x.strokeStyle="#e8a33d"; x.lineWidth=10; x.strokeRect(18,18,964,664);
+    this.chip(x,70,640,30); this.chip(x,930,640,30);
+    this.chip(x,70,60,24); this.chip(x,930,60,24);
+    x.textAlign="center";
+    x.fillStyle="#c98b1d"; x.font="bold 24px 'Trebuchet MS',sans-serif";
+    x.fillText("T H E   R O O K I E   B A K E R Y", 500, 78);
+    x.fillStyle="#5b3218"; x.font="bold 58px 'Trebuchet MS',sans-serif";
+    x.fillText(o.title, 500, 150);
+    x.font="140px serif";
+    x.fillText(o.face, 500, 300);
+    x.fillStyle="#e4586b"; x.font="bold 44px 'Trebuchet MS',sans-serif";
+    x.fillText(o.headline, 500, 385);
+    x.fillStyle="#5b3218"; x.font="bold 84px 'Trebuchet MS',sans-serif";
+    x.fillText(o.score, 500, 480);
+    x.fillStyle="#8a5a2b"; x.font="bold 26px 'Trebuchet MS',sans-serif";
+    x.fillText(o.stats, 500, 528);
+    x.fillStyle="#3d9e5f"; x.font="bold 34px 'Trebuchet MS',sans-serif";
+    x.fillText(o.verdict, 500, 585);
+    x.fillStyle="#c98b1d"; x.font="bold 20px 'Trebuchet MS',sans-serif";
+    x.fillText("rookies make cookies \u00B7 rookie hacks \u00B7 "+dateShort(), 500, 655);
+    return c;
+  },
+  save(c,name){
+    try{
+      const a=document.createElement("a");
+      a.download=name; a.href=c.toDataURL("image/png");
+      document.body.appendChild(a); a.click(); a.remove();
+      Sfx.gold();
+    }catch(e){}
+  },
+  fromGameOver(){
+    const c=this.make({
+      title: game.daily ? "DAILY BATCH" : "BAKER CARD",
+      face: $("judgeFace").textContent,
+      headline: $("rankName").textContent,
+      score: $("fScore").textContent+" pts",
+      stats: "best combo "+$("fCombo").textContent+" \u00B7 "+$("fCookies").textContent+" cookies \u00B7 wave "+$("fWave").textContent,
+      verdict: "good? "+$("vGood").textContent+"   cool? "+$("vCool").textContent
+    });
+    this.save(c, game.daily ? "daily-batch-card.png" : "baker-card.png");
+  },
+  fromDuel(){
+    const c=this.make({
+      title: "COOKIE DUEL",
+      face: $("vsFace").textContent,
+      headline: $("vsWinner").textContent,
+      score: "\uD83D\uDD34 "+game.score.toLocaleString()+"  \u00B7  \uD83D\uDD35 "+game.p2.score.toLocaleString(),
+      stats: "60-second duel \u00B7 "+(game.cookies+game.p2.cookies)+" cookies fought over",
+      verdict: "good? \u2713\u2713   cool? \u2713\u2713"
+    });
+    this.save(c,"duel-card.png");
+  }
+};
+
+/* ---------- input ---------- */
+const Input = {
+  init(){
+    const vs = ()=> game.mode==="versus" && game.state==="play" && !game.demo;
+    window.addEventListener("mousemove", e=>{ if(!game.demo && game.state==="play") game.targetX=e.clientX; });
+    window.addEventListener("touchstart", e=>{ Sfx.unlock(); this.touch(e); }, {passive:true});
+    window.addEventListener("touchmove", e=>{ this.touch(e); }, {passive:true});
+
+    window.addEventListener("keydown", e=>{
+      if(e.key==="p"||e.key==="P"||e.key==="Escape"){
+        game.state==="play" ? UI.showPause() : UI.resume();
+      }
+      if(game.state==="menu" && (e.key===" "||e.key==="Enter")){ e.preventDefault(); game.reset("solo"); }
+      if(game.state==="over" && (e.key===" "||e.key==="Enter")){ e.preventDefault(); game.reset("solo"); }
+      if(game.state==="vs-over" && (e.key===" "||e.key==="Enter")){ e.preventDefault(); game.reset("versus"); }
+      if(game.state!=="play" || game.demo) return;
+      const k=e.key;
+      if(k==="a"||k==="A"||k==="d"||k==="D"){
+        /* A/D always drive the red tray */
+        game.targetX=clamp(game.trayX+(k==="d"||k==="D"?70:-70),0,W);
+      } else if(k==="ArrowLeft"||k==="ArrowRight"){
+        if(vs()) game.p2.targetX=clamp(game.p2.trayX+(k==="ArrowRight"?70:-70),0,W);
+        else game.targetX=clamp(game.trayX+(k==="ArrowRight"?70:-70),0,W);
+      }
+    });
+    window.addEventListener("blur", ()=>{ if(game.state==="play") UI.showPause(); });
+    document.addEventListener("visibilitychange", ()=>{ if(document.hidden && game.state==="play") UI.showPause(); });
+
+    $("btnPlay").addEventListener("click", ()=>{ Sfx.unlock(); Sfx.ui(); game.reset("solo"); });
+    $("btnDaily").addEventListener("click", ()=>{ Sfx.unlock(); Sfx.ui(); game.reset("daily"); });
+    $("btnVs").addEventListener("click", ()=>{ Sfx.unlock(); Sfx.ui(); game.reset("versus"); });
+    $("btnDemo").addEventListener("click", ()=>{ Sfx.unlock(); Sfx.ui(); game.reset("solo", true); });
+    $("btnTaste").addEventListener("click", ()=>{ Sfx.unlock(); Sfx.ui(); UI.openTaste(); });
+    $("btnResume").addEventListener("click", ()=>{ Sfx.ui(); UI.resume(); });
+    $("btnQuit").addEventListener("click", ()=>{ Sfx.ui(); game.state="menu"; Sfx.stopMusic(); UI.showStart(); });
+    $("btnAgain").addEventListener("click", ()=>{ Sfx.ui(); game.reset("solo"); });
+    $("btnCard").addEventListener("click", ()=>{ Sfx.ui(); BakerCard.fromGameOver(); });
+    $("btnMenu").addEventListener("click", ()=>{ Sfx.ui(); game.state="menu"; UI.showStart(); });
+    $("btnVsAgain").addEventListener("click", ()=>{ Sfx.ui(); game.reset("versus"); });
+    $("btnVsCard").addEventListener("click", ()=>{ Sfx.ui(); BakerCard.fromDuel(); });
+    $("btnVsMenu").addEventListener("click", ()=>{ Sfx.ui(); game.state="menu"; UI.showStart(); });
+    $("btnPause").addEventListener("click", ()=>{
+      Sfx.ui(); game.state==="play"?UI.showPause():game.state==="pause"&&UI.resume();
+    });
+    $("btnMute").addEventListener("click", ()=>{
+      const on=Sfx.toggleMusic();
+      $("btnMute").textContent = on?"🔊":"🔇";
+    });
+
+    /* taste test */
+    $("ttAdd").addEventListener("click", ()=>{ Sfx.unlock(); TasteTest.add(); });
+    $("ttName").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); TasteTest.add(); } });
+    $("ttCeremony").addEventListener("click", ()=>{ Sfx.unlock(); TasteTest.ceremony(); });
+    $("ttBack").addEventListener("click", ()=>{ Sfx.ui(); UI.showStart(); });
+    $("ttCopy").addEventListener("click", ()=>{ TasteTest.copyResults(); });
+    $("ttDoneBack").addEventListener("click", ()=>{ Sfx.ui(); UI.openTaste(); });
+    $("ttDoneMenu").addEventListener("click", ()=>{ Sfx.ui(); UI.showStart(); });
+
+    /* first gesture unlocks audio context (autoplay policy) */
+    window.addEventListener("pointerdown", ()=>Sfx.unlock(), {once:false});
+  },
+  touch(e){
+    if(game.demo || game.state!=="play") return;
+    if(game.mode==="versus"){
+      /* split screen: left half = red tray, right half = blue tray */
+      for(const t of e.touches){
+        if(t.clientX < W/2) game.targetX=t.clientX;
+        else game.p2.targetX=t.clientX;
+      }
+    } else if(e.touches.length){
+      game.targetX=e.touches[0].clientX;
+    }
+  }
+};
+
+/* ---------- rendering ---------- */
+function drawBackground(){
+  /* bakery wall + counter */
+  const g=ctx.createLinearGradient(0,0,0,H);
+  if(game.fever>0){ g.addColorStop(0,"#7a3520"); g.addColorStop(1,"#4a2410"); }
+  else { g.addColorStop(0,"#6b3f1d"); g.addColorStop(1,"#3a2010"); }
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  /* subtle tiles */
+  ctx.strokeStyle="rgba(255,255,255,.04)"; ctx.lineWidth=1;
+  const tile=64;
+  for(let x=0;x<W;x+=tile){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=0;y<H;y+=tile){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  /* counter */
+  ctx.fillStyle="#7c4a21"; ctx.fillRect(0,H-30,W,30);
+  ctx.fillStyle="#96dbcf"; ctx.fillRect(0,H-30,W,6);
+  ctx.fillStyle="rgba(0,0,0,.18)"; ctx.fillRect(0,H-24,W,3);
+  /* floating flour motes */
+  if(game.flour.length){
+    ctx.fillStyle="rgba(255,246,232,.14)";
+    for(const f of game.flour){
+      f.y-=f.v*0.016; f.x+=f.drift*0.016;
+      if(f.y<-4){f.y=H+4;f.x=rand(0,W);}
+      if(f.x<-4)f.x=W+4; if(f.x>W+4)f.x=-4;
+      ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,Math.PI*2); ctx.fill();
+    }
+  }
+  /* fever aura */
+  if(game.fever>0){
+    const a=0.10+0.06*Math.sin(performance.now()/90);
+    ctx.fillStyle=`rgba(255,180,60,${a})`; ctx.fillRect(0,0,W,H);
+  }
+  /* vignette */
+  const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.45,W/2,H/2,Math.max(W,H)*0.8);
+  v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,"rgba(0,0,0,.42)");
+  ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+}
+
+function drawItems(){
+  for(const it of game.items){
+    ctx.save();
+    if(it.kind==="gold"){
+      /* glow behind golden cookies */
+      const gg=ctx.createRadialGradient(it.x,it.y,it.r*0.4,it.x,it.y,it.r*2.4);
+      gg.addColorStop(0,"rgba(255,211,77,.4)"); gg.addColorStop(1,"rgba(255,211,77,0)");
+      ctx.fillStyle=gg; ctx.fillRect(it.x-it.r*2.4,it.y-it.r*2.4,it.r*4.8,it.r*4.8);
+    }
+    if(it.kind==="burnt"){
+      /* smoke wisp */
+      ctx.globalAlpha=.5; ctx.fillStyle="#777";
+      ctx.beginPath();
+      ctx.arc(it.x+Math.sin(it.wobble)*4, it.y-it.r-8, it.r*0.3, 0, Math.PI*2);
+      ctx.arc(it.x+Math.sin(it.wobble+1)*6, it.y-it.r-16, it.r*0.2, 0, Math.PI*2);
+      ctx.fill(); ctx.globalAlpha=1;
+    }
+    switch(it.kind){
+      case "cookie": Sprites.cookie(it.x,it.y,it.r,it.rot); break;
+      case "gold":   Sprites.gold(it.x,it.y,it.r,it.rot); break;
+      case "burnt":  Sprites.burnt(it.x,it.y,it.r,it.rot); break;
+      case "milk":   Sprites.milk(it.x,it.y,it.r,it.rot); break;
+      case "sisu":   Sprites.sisu(it.x,it.y,it.r,it.rot); break;
+    }
+    ctx.restore();
+  }
+}
+
+function drawTray(){
+  const vs = game.mode==="versus";
+  const drawOne = (x, shield, fever, mitt, label, stun)=>{
+    if(fever>0){
+      const gg=ctx.createRadialGradient(x,H-58,10,x,H-58,90);
+      gg.addColorStop(0,"rgba(255,211,77,.45)"); gg.addColorStop(1,"rgba(255,211,77,0)");
+      ctx.fillStyle=gg; ctx.fillRect(x-90,H-148,180,180);
+    }
+    Sprites.tray(x, H-56, game.trayW, false, shield, mitt);
+    Sprites.cookie(x, H-62, 11, Math.sin(performance.now()/400)*0.15);
+    ctx.font="bold 12px Trebuchet MS"; ctx.textAlign="center";
+    ctx.fillStyle="rgba(255,255,255,.85)";
+    ctx.fillText(label, x, H-92);
+    if(stun>0 && Math.floor(performance.now()/120)%2===0){
+      ctx.font="22px serif"; ctx.fillText("😵", x, H-118);
+    }
+  };
+  if(vs){
+    drawOne(game.trayX, game.shield, game.fever, "#e4586b", "🔴 P1", game.stun);
+    drawOne(game.p2.trayX, game.p2.shield, game.p2.fever, "#4d7cf0", "🔵 P2", game.p2.stun);
+  } else {
+    drawOne(game.trayX, game.shield, game.fever, undefined, game.demo?"🤖 auto-baker":"", game.stun);
+  }
+}
+
+/* ---------- main loop (fixed timestep) ---------- */
+let last=performance.now(), acc=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  let dt=(now-last)/1000; last=now;
+  if(dt>0.25) dt=0.25;
+  acc+=dt;
+  const step=1/120;
+  let guard=0;
+  while(acc>=step && guard++<8){
+    game.update(step);
+    juice.update(step);
+    acc-=step;
+  }
+  /* render */
+  ctx.save();
+  if(juice.shakeT>0){
+    const m=juice.shakeMag*(juice.shakeT/0.3);
+    ctx.translate(rand(-m,m),rand(-m,m));
+  }
+  drawBackground();
+  drawItems();
+  drawTray();
+  juice.draw();
+  ctx.restore();
+}
+
+/* ---------- boot ---------- */
+Input.init();
+TasteTest.seed();
+UI.showStart();
+requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>
